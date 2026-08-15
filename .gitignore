@@ -1,0 +1,4 @@
+log/
+*.log
+.htaccess
+config.phastapi.override.php
