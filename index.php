@@ -22,10 +22,11 @@ include_once(__DIR__ . "/libs/phastapi.utils.php");
 
 
 
-if (isset($_GET["test"]) && $_GET["test"] == "true") {
-    include_once(__DIR__ . "/config.test.phastapi.php");      // configuration
+if (getenv("PHASTAPI_USE_TEST_CONFIG") === "true" &&
+    file_exists(__DIR__ . "/config.test.phastapi.php")) {
+    include_once(__DIR__ . "/config.test.phastapi.php");
 } else {
-    include_once(__DIR__ . "/config.phastapi.php");      // configuration
+    include_once(__DIR__ . "/config.phastapi.php");
 }
 include_once(__DIR__ . "/core/phastapi.logger.php");
 include_once(__DIR__ . "/core/phastapi.auth.php");   // authorization
