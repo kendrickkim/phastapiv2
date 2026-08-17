@@ -24,7 +24,7 @@ PHP 8 Attribute 기반 라우팅, URL 파라미터, JSON·FormData 파싱, 필�
 api/                          # PHAST API 프레임워크
 ├── index.php                 # 웹 진입점
 ├── config.phastapi.php       # 기본 설정과 사용자 앱 경로
-├── config.test.phastapi.php  # 선택적 테스트 설정
+├── config.test.phastapi.php  # 선택적 테스트 설정 (환경변수로만 전환)
 ├── index.phast.php           # 레거시 PHAST 토큰 인증
 ├── core/
 └── libs/
@@ -52,6 +52,7 @@ $G_PHASTAPI_CUSTOM_DIR = "../my-app";
 
 ```bash
 PHASTAPI_CUSTOM_DIR=../my-app
+PHASTAPI_USE_TEST_CONFIG=true   # config.test.phastapi.php 사용 (공개 URL로는 전환 불가)
 ```
 
 상대 경로는 `api/` 디렉터리 기준이며 절대 경로도 지원합니다.
