@@ -97,6 +97,12 @@ Options -Indexes -MultiViews
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /api/
+
+    # 소스·설정·로그는 웹으로 노출하지 않습니다.
+    RewriteRule ^\. - [F]
+    RewriteRule ^(core|libs|log)/ - [F]
+    RewriteRule ^(config[^/]*|index\.phast)\.php$ - [F]
+
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]
@@ -126,12 +132,18 @@ server {
         index index.php;
         try_files $uri $uri/ @phast;
 
-        location ~ \.php$ {
+        # 소스·설정·로그는 웹으로 노출하지 않습니다.
+        location ~ /\. { deny all; }
+        location ~ ^/api/(core|libs|log)/ { return 404; }
+
+        # PHP는 index.php만 실행합니다.
+        location ~ ^/api/index\.php$ {
             include fastcgi_params;
             fastcgi_param SCRIPT_FILENAME $request_filename;
             fastcgi_param HTTP_AUTHORIZATION $http_authorization;
             fastcgi_pass unix:/run/php/php8.1-fpm.sock;
         }
+        location ~ \.php$ { return 404; }
     }
 
     location = /api {
@@ -139,7 +151,7 @@ server {
     }
 
     location @phast {
-        rewrite ^/api/(.*)$ /api/index.php?/$1 last;
+        rewrite ^ /api/index.php last;
     }
 
     # index.php 외의 PHP 파일은 직접 실행하지 않습니다.
@@ -154,6 +166,29 @@ server {
 `Authorization`은 프레임워크가 `HTTP_AUTHORIZATION`과
 `REDIRECT_HTTP_AUTHORIZATION` 모두에서 읽지만, 위처럼 FastCGI에 명시적으로
 전달하는 편이 안전합니다.
+
+저장소를 그대로 웹 루트에 두면 `.git`, `core/`, `libs/`, 로그, 설정 파일이
+함께 노출되므로 위 차단 규칙을 반드시 유지하세요. 로그 경로
+(`$G_PHASTAPI_LOGPATH`)를 웹 루트 밖으로 옮기면 더 안전합니다.
+
+### 업로드 한도
+
+파일 업로드 API를 제공한다면 웹 서버와 PHP 양쪽의 한도를 함께 올려야
+합니다.
+
+```nginx
+# nginx (server 또는 location 블록)
+client_max_body_size 20m;
+```
+
+```ini
+; php.ini 또는 PHP-FPM 풀 설정
+upload_max_filesize = 20M
+post_max_size = 20M
+```
+
+Apache는 기본적으로 요청 본문 크기를 제한하지 않지만, `LimitRequestBody`가
+설정된 환경이라면 같이 확인하세요.
 
 ## 앱 설정 덮어쓰기
 

@@ -147,13 +147,17 @@ class PHASTAPI_CORE
             list($req_url, $query_string) = explode("?", $req_url, 2);
             parse_str($query_string, $parsed_query);
             $query_strings = (object) $parsed_query;
-        } else if (!empty($_SERVER["QUERY_STRING"])) {
-            // Front controllers often pass a path without "?...", so query
-            // parameters come from QUERY_STRING / $_GET instead.
-            parse_str((string)$_SERVER["QUERY_STRING"], $parsed_query);
-            $query_strings = (object) $parsed_query;
-        } else if (!empty($_GET) && is_array($_GET)) {
-            $query_strings = (object) $_GET;
+        } else {
+            // Front controllers pass a path without "?...", so read the query
+            // from the original REQUEST_URI (QUERY_STRING can be polluted by
+            // rewrite rules that pack the path into it).
+            $query_string = parse_url($_SERVER["REQUEST_URI"] ?? "", PHP_URL_QUERY);
+            if (is_string($query_string) && $query_string !== "") {
+                parse_str($query_string, $parsed_query);
+                $query_strings = (object) $parsed_query;
+            } else if (!empty($_GET) && is_array($_GET)) {
+                $query_strings = (object) $_GET;
+            }
         }
         // sort by patterns count and pattern
         usort(self::$apis, function ($a, $b) {
