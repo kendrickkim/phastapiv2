@@ -46,23 +46,32 @@ if (!empty($G_PHASTAPI_LEGACY_AUTH_ENABLE)) {
     include_once(__DIR__ . "/index.phast.php");
 }
 
-// url parsing
-$url = $_SERVER["REQUEST_URI"];
-if (($qs_pos = strpos($url, "?")) !== false) {
-    $url = substr($url, 0, $qs_pos);
+// URL parsing is based on REQUEST_URI so routing behaves the same behind
+// Apache mod_rewrite and Nginx/PHP-FPM.
+$url = phastapi_request_path();
+$base_url = phastapi_normalize_base_url($G_PHASTAPI_BASEURL);
+if ($base_url !== "" &&
+    $url !== $base_url &&
+    !str_starts_with($url, $base_url . "/")) {
+    http_response_code(404);
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode(["error" => "PHASTAPI_BASE_URL_MISMATCH"], JSON_UNESCAPED_SLASHES);
+    exit(0);
 }
-$urls = explode("/", $url);
-$num_slashes = count(explode("/", $G_PHASTAPI_BASEURL)) - 1;
+
+$relative_url = $base_url === "" ? $url : substr($url, strlen($base_url));
+$segments = array_values(array_filter(explode("/", trim($relative_url, "/")), "strlen"));
+$entry = $segments[0] ?? "";
 
 if (isset($G_SHOW_API_ENTRY) && $G_SHOW_API_ENTRY) {
     // api docs ------------------------
-    if ($urls[$num_slashes + 1] == "docs") {
+    if ($entry == "docs") {
         include_once(__DIR__ . "/core/phastapi.docs.php");
         exit(0);
     }
     // ----------------------------------
 
-    if ($urls[$num_slashes + 1] == "entries") {
+    if ($entry == "entries") {
         include_once(__DIR__ . "/core/phastapi.entry.php");
         show_entry();
         exit(0);
@@ -74,8 +83,8 @@ if (is_dir($G_PHASTAPI_DOMAIN_DIR . "/common")) {
     include_all_files_in_dir($G_PHASTAPI_DOMAIN_DIR . "/common");
 }
 
-if (count($urls) >= (2 + $num_slashes) && $urls[1 + $num_slashes] != "") {
-    auto_include($urls[1 + $num_slashes]); // auto include domain files
+if ($entry != "") {
+    auto_include($entry); // auto include domain files
     // this line is last of framework
     include_once(__DIR__ . "/core/phastapi.request.parser.php");
 } else {

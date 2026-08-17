@@ -4,28 +4,8 @@ $G_ISCLI = php_sapi_name() == "cli";
 // echo("G_ISCLI : " . $G_ISCLI . "\n");
 
 $G_TIMEZONE = "Asia/Seoul";
-$web_root = @("http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']));
 $G_API_ROOT = __DIR__ . "/..";          // api root 패스
-$G_PHASTAPI_BASEURL = "/api";          // phastapi url 패스 (끝의 / 제외)
-
-$htaccess_path = __DIR__ . "/.htaccess";
-if (file_exists($htaccess_path)) {
-    foreach (file($htaccess_path) as $line) {
-        if (preg_match('/^\s*RewriteBase\s+(\S+)/i', $line, $matches)) {
-            $rewrite_base = trim($matches[1]);
-            $G_PHASTAPI_BASEURL = $rewrite_base === "/"
-                ? ""
-                : "/" . trim($rewrite_base, "/");
-            break;
-        }
-    }
-}
-
-if ($G_PHASTAPI_BASEURL !== "" && !str_starts_with($G_PHASTAPI_BASEURL, "/")) {
-    http_response_code(500);
-    echo ("G_PHASTAPI_BASEURL must start with '/'");
-    exit(1);
-}
+$G_PHASTAPI_BASEURL = phastapi_detect_base_url(); // PHASTAPI_BASE_URL 또는 index.php 경로
 $G_SUPPORT_PLANTUML = true;             // plantuml 지원 여부
 $G_PLANTUML_URL = "https://www.plantuml.com/plantuml/svg";    // plantuml 서버 주소
 
@@ -91,6 +71,7 @@ include_all_files_in_dir($custom_filter_path);
 if (file_exists($custom_override_config_file_path)) {
     $G_API_ROOT = $G_PHASTAPI_CUSTOM_DIR;
     include_once($custom_override_config_file_path);
+    $G_PHASTAPI_BASEURL = phastapi_normalize_base_url($G_PHASTAPI_BASEURL);
 
     // 사용자 정의 에러 코드 추가
     if (isset($G_CUSTOM_ERROR_CODE)) {

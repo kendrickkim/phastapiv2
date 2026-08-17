@@ -251,7 +251,7 @@ class PHASTAPI_CORE
     }
     public static function GetPageParams()
     {
-        $headers = apache_request_headers_insensitive();
+        $headers = request_headers_insensitive();
         $r = new PHASTAPI_LIST_PARAM();
         if (!isset($headers["x-page-param"])) {
             return $r;

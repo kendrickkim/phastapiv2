@@ -14,7 +14,7 @@ PHP 8 Attribute 기반 라우팅, URL 파라미터, JSON·FormData 파싱, 필�
 ## 요구 사항
 
 - PHP 8.1 이상 권장 (PHP 7 레거시 라우팅도 일부 지원)
-- Apache `mod_rewrite`
+- Apache `mod_rewrite` 또는 Nginx + PHP-FPM
 - JSON 확장
 - 애플리케이션이 사용하는 DB·파일 관련 PHP 확장
 
@@ -67,7 +67,26 @@ PHASTAPI_CUSTOM_DIR=../my-app
 예를 들어 `/api/posts/10` 요청은 `domain/posts/`를 로드합니다.
 복수형 도메인이 없으면 끝의 `s`를 제거한 디렉터리도 확인합니다.
 
-## Apache 설정
+## 웹 서버 설정
+
+PHAST API는 Apache와 Nginx에서 같은 방식으로 동작합니다. `/api`처럼 하위
+경로에 배치할 때는 모든 API 요청을 `index.php`로 보내세요.
+
+기준 경로는 다음 순서로 결정됩니다.
+
+1. 환경변수 `PHASTAPI_BASE_URL`
+2. `SCRIPT_NAME`에 나타난 `index.php`의 경로
+3. CLI처럼 웹 경로를 알 수 없는 경우 기본값 `/api`
+
+애플리케이션의 `config.phastapi.override.php`에서 `$G_PHASTAPI_BASEURL`을
+지정하면 이 값을 덮어쓸 수 있습니다. 값은 `/api`처럼 앞에 `/`를 붙이고 끝의
+`/`는 생략합니다. 문서 루트에서 바로 실행하면 빈 문자열을 사용합니다.
+
+```bash
+PHASTAPI_BASE_URL=/api
+```
+
+### Apache
 
 `api/.htaccess`:
 
@@ -83,15 +102,57 @@ Options -Indexes -MultiViews
 </IfModule>
 ```
 
-`RewriteBase`는 `/api`와 `/api/` 모두 같은 값으로 정규화됩니다.
-문서 루트에서 바로 사용할 때는 `/`를 지정할 수 있습니다.
-
 Apache가 `Authorization` 헤더를 PHP에 전달하지 않는 환경에서는 서버 설정에
 다음 규칙이 필요할 수 있습니다.
 
 ```apacheconf
 SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 ```
+
+### Nginx
+
+아래 예제는 PHAST API 저장소를 `/var/www/phastapiv2`에 두고 `/api`로
+서비스합니다. PHP-FPM 소켓은 서버 환경에 맞게 바꾸세요.
+
+```nginx
+server {
+    listen 80;
+    server_name api.example.com;
+    root /var/www;
+
+    location /api/ {
+        alias /var/www/phastapiv2/;
+        index index.php;
+        try_files $uri $uri/ @phast;
+
+        location ~ \.php$ {
+            include fastcgi_params;
+            fastcgi_param SCRIPT_FILENAME $request_filename;
+            fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+            fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        }
+    }
+
+    location = /api {
+        return 301 /api/;
+    }
+
+    location @phast {
+        rewrite ^/api/(.*)$ /api/index.php?/$1 last;
+    }
+
+    # index.php 외의 PHP 파일은 직접 실행하지 않습니다.
+    location ~ \.php$ {
+        return 404;
+    }
+}
+```
+
+`alias`와 `try_files`를 함께 사용할 때 `$document_root$fastcgi_script_name`은
+잘못된 파일 경로가 될 수 있으므로 `$request_filename`을 사용합니다.
+`Authorization`은 프레임워크가 `HTTP_AUTHORIZATION`과
+`REDIRECT_HTTP_AUTHORIZATION` 모두에서 읽지만, 위처럼 FastCGI에 명시적으로
+전달하는 편이 안전합니다.
 
 ## 앱 설정 덮어쓰기
 

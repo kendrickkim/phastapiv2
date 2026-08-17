@@ -95,7 +95,7 @@ class PHASTAPI_AUTH
 
     public static function GetAccessToken()
     {
-        $headers = apache_request_headers_insensitive();
+        $headers = request_headers_insensitive();
         if (isset($headers["authorization"])) {
             $authorization = trim((string)$headers["authorization"]);
             if (preg_match('/^(MBPAuth|Bearer)\s+(\S+)$/i', $authorization, $matches)) {

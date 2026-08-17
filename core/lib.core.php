@@ -91,9 +91,11 @@ function PReturn( $data, $false_message = "" )
     exit(0);
 }
 
-function apache_request_headers_insensitive()
+function request_headers_insensitive()
 {
-    if (function_exists("apache_request_headers")) {
+    if (function_exists("getallheaders")) {
+        $headers = getallheaders();
+    } else if (function_exists("apache_request_headers")) {
         $headers = apache_request_headers();
     } else {
         $headers = [];
@@ -107,14 +109,81 @@ function apache_request_headers_insensitive()
             }
         }
     }
+    if (!is_array($headers)) {
+        $headers = [];
+    }
+
+    // Some FastCGI/proxy configurations expose Authorization only through a
+    // dedicated server variable rather than getallheaders().
+    if (!isset($headers["Authorization"]) && !isset($headers["authorization"])) {
+        $authorization = $_SERVER["HTTP_AUTHORIZATION"]
+            ?? $_SERVER["REDIRECT_HTTP_AUTHORIZATION"]
+            ?? null;
+        if ($authorization !== null && $authorization !== "") {
+            $headers["Authorization"] = $authorization;
+        }
+    }
+
     $out = array();
-
-
     foreach ($headers as $key => $value) {
         $out[strtolower($key)] = $value;
     }
 
     return $out;
+}
+
+// Backward-compatible alias for existing PHAST applications.
+function apache_request_headers_insensitive()
+{
+    return request_headers_insensitive();
+}
+
+function phastapi_normalize_base_url( $base_url )
+{
+    $base_url = trim((string)$base_url);
+    if ($base_url === "" || $base_url === "/") {
+        return "";
+    }
+
+    $path = parse_url($base_url, PHP_URL_PATH);
+    if (!is_string($path)) {
+        $path = $base_url;
+    }
+
+    $path = "/" . trim($path, "/");
+    return $path === "/" ? "" : $path;
+}
+
+function phastapi_detect_base_url()
+{
+    $configured = getenv("PHASTAPI_BASE_URL");
+    if ($configured !== false) {
+        return phastapi_normalize_base_url($configured);
+    }
+
+    if (PHP_SAPI === "cli") {
+        return "/api";
+    }
+
+    // Works with Apache mod_php, Apache/Nginx FastCGI, and the PHP built-in
+    // server when index.php is the front controller.
+    $script_name = $_SERVER["SCRIPT_NAME"] ?? $_SERVER["PHP_SELF"] ?? "";
+    if ($script_name === "") {
+        return "/api";
+    }
+
+    $directory = str_replace("\\", "/", dirname($script_name));
+    return phastapi_normalize_base_url($directory);
+}
+
+function phastapi_request_path()
+{
+    $request_uri = $_SERVER["REQUEST_URI"] ?? "/";
+    $path = parse_url($request_uri, PHP_URL_PATH);
+    if (!is_string($path) || $path === "") {
+        return "/";
+    }
+    return "/" . ltrim(rawurldecode($path), "/");
 }
 
 if (!function_exists('str_starts_with')) {

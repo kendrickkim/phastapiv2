@@ -2,7 +2,7 @@
 $inputdata = "";
 $inputdata_json = null;
 
-$headers = apache_request_headers_insensitive();
+$headers = request_headers_insensitive();
 $content_type = strtolower((string)($headers["content-type"] ?? ""));
 $multiform_file_upload = str_starts_with($content_type, 'multipart/form-data');
 
@@ -92,7 +92,12 @@ try {
         }
     }
 
-    PHASTAPI::FindMatchedFunction($_SERVER["REQUEST_METHOD"], $_SERVER["REQUEST_URI"], $inputdata_json, $inputdata);
+    PHASTAPI::FindMatchedFunction(
+        $_SERVER["REQUEST_METHOD"],
+        phastapi_request_path(),
+        $inputdata_json,
+        $inputdata
+    );
 } catch ( Throwable $e ) {
     Log::error($e->getMessage());
     header('HTTP/1.0 500 Internal Server Error', true, 500);
